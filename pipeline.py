@@ -54,7 +54,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20200917.04'
+VERSION = '20200917.05'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'tencent-weibo'
 TRACKER_HOST = 'trackerproxy.meo.ws'
@@ -115,8 +115,12 @@ class PrepareDirectories(SimpleTask):
         os.makedirs(dirname)
 
         item['item_dir'] = dirname
-        item['warc_file_base'] = '%s-%s-%s' % (self.warc_prefix, escaped_item_name[:50],
-            time.strftime('%Y%m%d-%H%M%S'))
+        item['warc_file_base'] = '-'.join([
+            self.warc_prefix,
+            escaped_item_name[:45],
+            hashlib.sha1(item_name.encode('utf8')).hexdigest()[:10],
+            time.strftime('%Y%m%d-%H%M%S')
+        ])
 
         open('%(item_dir)s/%(warc_file_base)s.warc.zst' % item, 'w').close()
         open('%(item_dir)s/%(warc_file_base)s_data.txt' % item, 'w').close()

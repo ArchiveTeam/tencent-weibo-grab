@@ -217,6 +217,12 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     and not string.match(url, "^https?://[^/]*qlogo%.cn/")
     and not string.match(url, "^https?://[^/]*qpic%.cn/") then
     html = read_file(file)
+    if string.match(html, "系统繁忙,请稍后再试")
+      or string.match(html, "5E23KW") then
+      io.stdout:write("Site is busy...\n")
+      io.stdout:flush()
+      abortgrab = true
+    end
     if string.match(url, "^https?://api%.t%.qq%.com/")
       and string.match(html, '^{"') then
       local data = load_json_file(html)
