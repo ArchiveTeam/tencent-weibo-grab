@@ -108,8 +108,8 @@ allowed = function(url, parenturl)
     post_ids[string.match(url, "([0-9]+)$")] = true
   end
 
-  if string.match(url, "^https?://[^/]*qlogo%.cn/")
-    or string.match(url, "^https?://[^/]*qpic%.cn/") then
+  if string.match(url, "^https?://[^/]*qlogo%.cn/.")
+    or string.match(url, "^https?://[^/]*qpic%.cn/.") then
     return true
   end
 
