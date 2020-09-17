@@ -54,7 +54,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20200917.01'
+VERSION = '20200917.02'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'tencent-weibo'
 TRACKER_HOST = 'trackerproxy.meo.ws'
@@ -218,17 +218,17 @@ class WgetArgs(object):
             '--warc-header', ItemInterpolation('tencent-weibo-item: %(item_name)s'),
             '--warc-dedup-url-agnostic',
             '--warc-compression-use-zstd',
-#            '--warc-zstd-dict-no-include'
+            '--warc-zstd-dict-no-include'
         ]
 
-#        dict_data = ZstdDict.get_dict()
-#        with open(os.path.join(item['item_dir'], 'zstdict'), 'wb') as f:
-#            f.write(dict_data['dict'])
-#        item['dict_id'] = dict_data['id']
-#        item['dict_project'] = TRACKER_ID
-#        wget_args.extend([
-#            '--warc-zstd-dict', ItemInterpolation('%(item_dir)s/zstdict'),
-#        ])
+        dict_data = ZstdDict.get_dict()
+        with open(os.path.join(item['item_dir'], 'zstdict'), 'wb') as f:
+            f.write(dict_data['dict'])
+        item['dict_id'] = dict_data['id']
+        item['dict_project'] = TRACKER_ID
+        wget_args.extend([
+            '--warc-zstd-dict', ItemInterpolation('%(item_dir)s/zstdict'),
+        ])
 
         item_name = item['item_name']
         item_type, item_value = item_name.split(':')
