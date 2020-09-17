@@ -54,7 +54,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20200917.03'
+VERSION = '20200917.04'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'tencent-weibo'
 TRACKER_HOST = 'trackerproxy.meo.ws'
@@ -126,7 +126,6 @@ class MoveFiles(SimpleTask):
         SimpleTask.__init__(self, 'MoveFiles')
 
     def process(self, item):
-        time.sleep(1000)
         os.rename('%(item_dir)s/%(warc_file_base)s.warc.zst' % item,
               '%(data_dir)s/%(warc_file_base)s.%(dict_project)s.%(dict_id)s.warc.zst' % item)
         os.rename('%(item_dir)s/%(warc_file_base)s_data.txt' % item,
