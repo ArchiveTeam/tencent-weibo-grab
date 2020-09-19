@@ -41,7 +41,7 @@ if StrictVersion(seesaw.__version__) < StrictVersion('0.8.5'):
 
 WGET_AT = find_executable(
     'Wget+AT',
-    ['GNU Wget 1.20.3-at.20200917.01'],
+    ['GNU Wget 1.20.3-at.20200919.01'],
     ['./wget-at']
 )
 
@@ -54,7 +54,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20200917.05'
+VERSION = '20200919.01'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'tencent-weibo'
 TRACKER_HOST = 'trackerproxy.meo.ws'

@@ -9,20 +9,37 @@ local item_type = os.getenv('item_type')
 local item_dir = os.getenv('item_dir')
 local warc_file_base = os.getenv('warc_file_base')
 
+local item_value_lower = string.lower(item_value)
+
 local url_count = 0
 local tries = 0
 local downloaded = {}
 local addedtolist = {}
 local abortgrab = false
 
-local requeue_count = {}
 local discovered = {}
 discovered[item_value] = true
+
+local current_response_url = nil
+local current_response_body = nil
+local current_response_retry = true
+local current_response_retry_reason = nil
 
 local post_ids = {}
 
 for ignore in io.open("ignore-list", "r"):lines() do
   downloaded[ignore] = true
+end
+
+for ignore in io.open("ignore-user-list", "r"):lines() do
+  discovered[ignore] = true
+end
+
+reset_current_response = function()
+  current_response_url = nil
+  current_response_body = nil
+  current_response_retry = true
+  current_response_retry_reason = nil
 end
 
 load_json_file = function(file)
@@ -87,6 +104,13 @@ allowed = function(url, parenturl)
     or string.match(url, "^https?://t%.qq%.com/guest/")
     or string.match(url, "^https?://t%.qq%.com/login%.php")
     or string.match(url, "^https?://t%.qq%.com/old/message%.php%?id=[0-9]+$")
+    or string.match(url, "^https?://t%.qq%.com/[a-zA-Z0-9%-_]+/?%?preview$")
+    or string.match(url, "^https?://t%.qq%.com/[a-zA-Z0-9%-_]+/?%?mode=[01]$")
+    or string.match(url, "^https?://t%.qq%.com/[a-zA-Z0-9%-_]+/following$")
+    or string.match(url, "^https?://t%.qq%.com/[a-zA-Z0-9%-_]+/follower$")
+    or string.match(url, "^https?://t%.qq%.com/[a-zA-Z0-9%-_]+/following%?t=[12]$")
+    or string.match(url, "^https?://t%.qq%.com/app/qzphoto/")
+    or string.match(url, "^https?://t%.qq%.com/messages/sendbox")
     or string.match(url, "^https?://api%.t%.qq%.com/old/message%.php%?id=[0-9]+&format=1$") then
     return false
   end
@@ -114,7 +138,7 @@ allowed = function(url, parenturl)
   end
 
   for s in string.gmatch(url, "([a-zA-Z0-9%-_]+)") do
-    if s == item_value then
+    if string.lower(s) == item_value_lower then
       return true
     end
   end
@@ -130,6 +154,10 @@ allowed = function(url, parenturl)
     if post_ids[s] then
       return true
     end
+  end
+
+  if string.match(url, "^https?://[^/]*url%.cn/[a-zA-Z0-9]+") then
+    return true
   end
 
   return false
@@ -168,8 +196,10 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     if (downloaded[url_] ~= true and addedtolist[url_] ~= true)
       and allowed(url_, origurl) then
       table.insert(urls, { url=url_ })
-      addedtolist[url_] = true
-      addedtolist[url] = true
+      if file ~= nil then
+        addedtolist[url_] = true
+        addedtolist[url] = true
+      end
     end
   end
 
@@ -216,12 +246,10 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
   if allowed(url, nil)
     and not string.match(url, "^https?://[^/]*qlogo%.cn/")
     and not string.match(url, "^https?://[^/]*qpic%.cn/") then
-    html = read_file(file)
-    if string.match(html, "系统繁忙,请稍后再试")
-      or string.match(html, "5E23KW") then
-      io.stdout:write("Site is busy...\n")
-      io.stdout:flush()
-      abortgrab = true
+    if current_response_url == url and current_response_body ~= nil then
+      html = current_response_body
+    else
+      html = read_file(file)
     end
     if string.match(url, "^https?://api%.t%.qq%.com/")
       and string.match(html, '^{"') then
@@ -229,28 +257,6 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
       if data["info"] then
         html = data["info"]
       end
-      local real_count = tonumber(string.match(html, '<li class="select">[^%(<]+%(?([^<%)]*)%)?</li>'))
-      if real_count == nil then
-        real_count = 0
-      end
-      local _, received_count = string.gsub(html, '<div class="msgBox">', "")
-      if real_count > received_count then
-        io.stdout:write("Received fewer replies than available.\n")
-        if requeue_count[url] == nil then
-          requeue_count[url] = 0
-        end
-        if requeue_count[url] < 10 then
-          requeue_count[url] = requeue_count[url] + 1
-          io.stdout:write("Requeuing URL.\n")
-          table.insert(urls, { url=url })
-        else
-          io.stdout:write("Max requeues reached.\n")
-        end
-        io.stdout:flush()
-      end
-    end
-    for match in string.gmatch(html, "{url%s*:%s*'http://api%.t%.qq%.com/asyn/tag_oper_n.php'%s*,%s*data:%s*{([^}]+)}") do
-      --TODO
     end
     for url, params in string.gmatch(html, "url%s*:%s*'(http://api%.t%.qq%.com/old/message.php[^']+)'%s*,%s*auto%s*:%s*'([^']+)'") do
       check(url .. "&" .. params .. "&g_tk=")
@@ -278,7 +284,69 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     end
   end
 
+  if file ~= nil then
+    reset_current_response()
+  end
+
   return urls
+end
+
+wget.callbacks.write_to_warc = function(url, http_stat)
+  reset_current_response()
+  if http_stat["statcode"] == 200
+    and string.match(url["url"], "^https?://t%.qq%.com/")
+    and allowed(url["url"], nil)
+    and not string.match(url["url"], "^https?://t%.qq%.com/p/t/") then
+    current_response_retry_reason = "200"
+    current_response_retry = true
+    return false
+  end
+  if allowed(url["url"], nil)
+    and not string.match(url["url"], "^https?://[^/]*qlogo%.cn/")
+    and not string.match(url["url"], "^https?://[^/]*qpic%.cn/") then
+    current_response_url = url["url"]
+    current_response_body = read_file(http_stat["local_file"])
+    wget.callbacks.get_urls(nil, url["url"], nil, nil)
+    if string.match(url["url"], "^https?://api%.t%.qq%.com/")
+      and string.match(current_response_body, '^{"') then
+      local data = load_json_file(current_response_body)
+      if data["info"] then
+        data = data["info"]
+      else
+        current_response_retry_reason = "incomplete"
+        current_response_retry = true
+        return false
+      end
+      local real_count = string.match(data, '<li class="select">[^%(<]+%(?([^<%)]*)%)?</li>')
+      real_count = tonumber(real_count)
+      if real_count == nil then
+        real_count = 0
+      end
+      local _, received_count = string.gsub(data, '<div class="msgBox">', "")
+      if real_count > received_count then
+        current_response_retry_reason = "incomplete"
+        current_response_retry = true
+        return false
+      end
+    end
+    if string.match(current_response_body, "系统繁忙,请稍后再试")
+      or string.match(current_response_body, "想了解TA的近况吗")
+      or string.match(current_response_body, "TA还没有上传头像")
+      or string.match(current_response_body, '<div%s+class="guide') then
+      current_response_retry_reason = "busy"
+      current_response_retry = true
+      return false
+    end
+    if string.match(url["url"], "^https?://t%.qq%.com/")
+      and string.len(current_response_body) < 20000
+      and http_stat["statcode"] ~= 404 then
+      current_response_retry_reason = "size"
+      current_response_retry = true
+      return false
+    end
+  end
+  current_response_retry = false
+  return true
 end
 
 wget.callbacks.httploop_result = function(url, err, http_stat)
@@ -288,7 +356,8 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
   io.stdout:write(url_count .. "=" .. status_code .. " " .. url["url"] .. "  \n")
   io.stdout:flush()
 
-  if status_code >= 300 and status_code <= 399 then
+  if status_code >= 300 and status_code <= 399
+    and not current_response_retry then
     local newloc = urlparse.absolute(url["url"], http_stat["newloc"])
     if downloaded[newloc] == true or addedtolist[newloc] == true
       or not allowed(newloc, url["url"]) then
@@ -307,27 +376,51 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
     io.stdout:flush()
     return wget.actions.ABORT
   end
-  
-  if status_code >= 500
-      or (
-        status_code >= 400
-        and status_code ~= 404
-        and status_code ~= 406
-        and status_code ~= 451
-      )
-      or status_code  == 0 then
-    io.stdout:write("Server returned "..http_stat.statcode.." ("..err.."). Sleeping.\n")
+
+  if current_response_retry_reason ~= nil then
+    if current_response_retry_reason == "busy" then
+      io.stdout:write("Site is busy.\n")
+    elseif current_response_retry_reason == "200" then
+      io.stdout:write("Should not get 200 on this URL.\n")
+    elseif current_response_retry_reason == "incomplete" then
+      io.stdout:write("Got incomplete copy of webpage.\n")
+    elseif current_response_retry_reason == "size" then
+      io.stdout:write("Webpage too small in size.\n")
+    end
     io.stdout:flush()
-    local maxtries = 10
+  end
+
+  response_retry = current_response_retry
+  response_retry_reason = current_response_retry_reason
+
+  reset_current_response()
+
+  if status_code >= 500
+    or (
+      status_code >= 400
+      and status_code ~= 404
+      and status_code ~= 406
+      and status_code ~= 451
+    )
+    or status_code == 0
+    or response_retry then
+    io.stdout:write("Server returned " .. http_stat.statcode .. " (" .. err .. "). Sleeping.\n")
+    io.stdout:flush()
+    local maxtries = 12
     if not allowed(url["url"], nil)
-      or (status_code == 400 and string.match(url["url"], "^https?://[^/]*qpic%.cn/")) then
+      or (
+        status_code == 400
+        and string.match(url["url"], "^https?://[^/]*qpic%.cn/")
+      ) then
       maxtries = 3
+    elseif response_retry_reason == "incomplete" then
+      maxtries = 2
     end
     if tries >= maxtries then
-      io.stdout:write("\nI give up...\n")
+      io.stdout:write("I give up...\n")
       io.stdout:flush()
       tries = 0
-      if maxtries == 3 then
+      if maxtries == 3 or response_retry_reason == "incomplete" then
         return wget.actions.EXIT
       else
         return wget.actions.ABORT
