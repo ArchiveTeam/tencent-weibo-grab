@@ -199,7 +199,8 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     if string.match(url_, "^https://[^/]*t%.qq%.com/") then
       url_ = string.gsub(url_, "^https://", "http://")
     elseif string.match(url_, "^https?://api%.t%.qq%.com/")
-      and not string.match(url_, "g_tk=") then
+      and not string.match(url_, "g_tk=")
+      and allowed(url_, origurl) then
       url_ = url_ .. "&g_tk="
     end
     if (downloaded[url_] ~= true and addedtolist[url_] ~= true)
