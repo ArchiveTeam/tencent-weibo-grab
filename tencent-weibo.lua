@@ -251,6 +251,9 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     else
       html = read_file(file)
     end
+    if string.match(url, "^https://[^/]*t%.qq%.com/") then
+      check(string.gsub(url, "^https://", "http://"))
+    end
     if string.match(url, "^https?://api%.t%.qq%.com/")
       and string.match(html, '^{"') then
       local data = load_json_file(html)
@@ -368,7 +371,6 @@ wget.callbacks.httploop_result = function(url, err, http_stat)
   
   if status_code >= 200 and status_code <= 399 then
     downloaded[url["url"]] = true
-    downloaded[string.gsub(url["url"], "https?://", "http://")] = true
   end
 
   if abortgrab == true then
