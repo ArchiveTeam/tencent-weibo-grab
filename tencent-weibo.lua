@@ -111,6 +111,12 @@ allowed = function(url, parenturl)
     or string.match(url, "^https?://t%.qq%.com/[a-zA-Z0-9%-_]+/following%?t=[12]$")
     or string.match(url, "^https?://t%.qq%.com/app/qzphoto/")
     or string.match(url, "^https?://t%.qq%.com/messages/sendbox")
+    or string.match(url, "^https?://t%.qq%.com/p/t/[0-9]+%?filter=1&select=9")
+    or string.match(url, "^https?://t%.qq%.com/p/t/[0-9]+%?filter=5&select=2")
+    or string.match(url, "^https?://t%.qq%.com/p/t/[0-9]+%?filter=6&select=3")
+    or string.match(url, "^https?://t%.qq%.com/p/t/[0-9]+%?filter=9&select=10")
+    or string.match(url, "^https?://p%.t%.qq%.com/m/home_userinfo%.php")
+    or string.match(url, "^https?://p%.t%.qq%.com/levelDetail%.php")
     or string.match(url, "^https?://api%.t%.qq%.com/old/message%.php%?id=[0-9]+&format=1$") then
     return false
   end
@@ -192,6 +198,9 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     url_ = string.match(url_, "^(.-)&?$")
     if string.match(url_, "^https://[^/]*t%.qq%.com/") then
       url_ = string.gsub(url_, "^https://", "http://")
+    elseif string.match(url_, "^https?://api%.t%.qq%.com/")
+      and not string.match(url_, "g_tk=") then
+      url_ = url_ .. "&g_tk="
     end
     if (downloaded[url_] ~= true and addedtolist[url_] ~= true)
       and allowed(url_, origurl) then
@@ -254,6 +263,10 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
     if string.match(url, "^https://[^/]*t%.qq%.com/") then
       check(string.gsub(url, "^https://", "http://"))
     end
+    local match1, match2 = string.match(url, "^https?://t%.qq%.com/p/t/([0-9]+)%?(.*&mid=[0-9]+.*)$")
+    if match1 and match2 then
+      check("http://api.t.qq.com/old/message.php?id=" .. match1 .. "&" .. match2)
+    end
     if string.match(url, "^https?://api%.t%.qq%.com/")
       and string.match(html, '^{"') then
       local data = load_json_file(html)
@@ -310,7 +323,10 @@ wget.callbacks.write_to_warc = function(url, http_stat)
     current_response_url = url["url"]
     current_response_body = read_file(http_stat["local_file"])
     wget.callbacks.get_urls(nil, url["url"], nil, nil)
-    if string.match(url["url"], "^https?://api%.t%.qq%.com/")
+    if (
+        string.match(url["url"], "^https?://api%.t%.qq%.com/")
+        or string.match(url["url"], "^https?://t%.qq%.com/p/t/[0-9]+%?.*&mid=[0-9]+")
+      )
       and string.match(current_response_body, '^{"') then
       local data = load_json_file(current_response_body)
       if data["info"] then
@@ -326,7 +342,8 @@ wget.callbacks.write_to_warc = function(url, http_stat)
         real_count = 0
       end
       local _, received_count = string.gsub(data, '<div class="msgBox">', "")
-      if real_count > received_count then
+      if real_count > received_count
+        and not string.match(data, 'href="[^"]*p=[0-9]+[^"]*mid=[^"]*"') then
         current_response_retry_reason = "incomplete"
         current_response_retry = true
         return false
@@ -342,7 +359,8 @@ wget.callbacks.write_to_warc = function(url, http_stat)
     end
     if string.match(url["url"], "^https?://t%.qq%.com/")
       and string.len(current_response_body) < 20000
-      and http_stat["statcode"] ~= 404 then
+      and http_stat["statcode"] ~= 404
+      and not string.match(url["url"], "^https?://t%.qq%.com/p/t/[0-9]+%?.*&mid=[0-9]+") then
       current_response_retry_reason = "size"
       current_response_retry = true
       return false

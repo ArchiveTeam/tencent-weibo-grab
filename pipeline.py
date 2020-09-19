@@ -54,7 +54,7 @@ if not WGET_AT:
 #
 # Update this each time you make a non-cosmetic change.
 # It will be added to the WARC files and reported to the tracker.
-VERSION = '20200919.02'
+VERSION = '20200919.03'
 USER_AGENT = 'Archive Team'
 TRACKER_ID = 'tencent-weibo'
 TRACKER_HOST = 'trackerproxy.meo.ws'
@@ -274,7 +274,7 @@ pipeline = Pipeline(
     PrepareDirectories(warc_prefix='tencent-weibo'),
     WgetDownload(
         WgetArgs(),
-        max_tries=2,
+        max_tries=1,
         accept_on_exit_code=[0, 4, 8],
         env={
             'item_dir': ItemValue('item_dir'),
