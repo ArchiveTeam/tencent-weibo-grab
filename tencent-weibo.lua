@@ -138,6 +138,19 @@ allowed = function(url, parenturl)
     post_ids[string.match(url, "([0-9]+)$")] = true
   end]]
 
+  if string.match(url, "^https?://t%.qq%.com/[^%?]+%?.+&pi=[0-9]+")
+    and parenturl
+    and string.match(parenturl, "^https?://t%.qq%.com/[^%?]+") then
+    current = tonumber(string.match(parenturl, "&pi=([0-9]+)"))
+    if not current then
+      current = 1
+    end
+    new = tonumber(string.match(url, "&pi=([0-9]+)"))
+    if current + 1 ~= new then
+      return false
+    end
+  end
+
   if string.match(url, "^https?://[^/]*qlogo%.cn/.")
     or string.match(url, "^https?://[^/]*qpic%.cn/.") then
     return true
