@@ -132,11 +132,11 @@ allowed = function(url, parenturl)
     tested[s] = tested[s] + 1
   end
 
-  if string.match(url, "^https?://t%.qq%.com/p/t/[0-9]+$")
+--[[  if string.match(url, "^https?://t%.qq%.com/p/t/[0-9]+$")
     and parenturl
     and not string.match(parenturl, "^https?://t%.qq%.com/p/t/[0-9]+") then
     post_ids[string.match(url, "([0-9]+)$")] = true
-  end
+  end]]
 
   if string.match(url, "^https?://[^/]*qlogo%.cn/.")
     or string.match(url, "^https?://[^/]*qpic%.cn/.") then
